@@ -1,183 +1,150 @@
 ''' ############################# INFO ##################################
-    
     This file contains functions to obtain input needed for the program:
-    
         - Get game data from the user
         - Format and parse it
         - Build a chess game object from the input
+    And also for output
+        - writing PGN etc.
         
     It relies on ce_config being run first.
 
-
     GLOBALS:
                 game_input: The game object returned and
-                            used by the rest of the program
-                            
+                            used by the rest of the program           
                 cl_args:    arguments user entered at
                             the command line.
 
     FLOW:
-    
         build_game              
         │                      
         │(calls)               
         │                      
-        ├─►get_pgn             
+        ├─► <REDO>     
         │   │                  
-        │   ├─────►fetch_stdin 
-        │   └─────►prompt_input
-        │                      
-        ├─►make_stream         
-        └─►parse_pgn           
-
+        │   ├─────►xxxx
+        │   └─────►yyy
     #####################################################################
 '''
 
 import logging
 import sys
-import io
+from io import StringIO
 import chess
 import chess.pgn
-
 import ce_config as cfg
 
 
+def fetch_cl_movelist():
+    ''' descr   : fetch the move list entered with '--game' CL argument.
+                  clean it up a bit and check basic validity
+        params  : None. Requires the cl_args global from ce_config.py
+        returns : move list as StringIO object'''
 
-def prompt_input():
+    global cl_args
+    movelist_io = None
 
-# - - - - - - - 
-# FN prompt_input
-# description   : Prompt user to enter PGN data, and return the entered text
-# parameters    : none
-# returns       : string containing text entered by user
-    
-    usr_input = None
-    print()
+    logging.info(" Checking CL args for input ...")
 
-    while usr_input is None or len(usr_input.strip()) < 2:
+    if cfg.cl_args['game']:
+        logging.info(" '--game' argument detected.")
+        move_list = cfg.cl_args['game'].strip()
+
+        if len(move_list) > 1:
+            logging.info(" Possible valid moves found in CL args.")
+            movelist_io = StringIO(move_list)
+
+    return movelist_io
+
+def fetch_file():
+    ''' descr   : fetch contents of file entered with '--import' CL argument.
+                  clean it up a bit and check basic validity
+        params  : None. Requires the cl_args global from ce_config.py
+        returns : file contents as StringIO object if valid
+                  Otherwise, "None" '''
+
+    global cl_args
+    file_stream = None
+
+    logging.info(" Checking for file input ...")
+
+    if cfg.cl_args['import']:
+        logging.info(" '--import' argument detected.")
+        logging.info (f" Attempting to load file : {cfg.cl_args['import']} ...")
         
-        try:
-            usr_input = input("Enter PGN data: ")
-        except (EOFError):
-            print ("Input ended before data could be found")
-            usr_input = None
+        with open(cfg.cl_args['import'], "rt") as pgnfile:
+            file_read = pgnfile.read().strip()
+            # logging.info (f" File contents :\n{file_read}")            
+            if len(file_read) > 1:
+                file_stream = StringIO(file_read)
+                logging.info(" Found some data in the file.")
+            else:
+                logging.info(" Couldn't find data in the file.")
 
-
-    logging.info (f" Input received: '{usr_input}'")
-
-    
-    return usr_input.strip()
-
+    return file_stream
 
 def fetch_stdin():
-# - - - - - - - 
-# FN fetch_stdin
-# description   : gets piped data if present
-# parameters    : None
-# returns       : string containing piped data or None
+    ''' descr   : gets stdin data if present, and do basic checks
+        params  : None
+        returns : StringIO object containing piped data if present, otherwise None '''
+
+    logging.info(" Checking for stdin input ...")
+
+    stdin_IO = None
 
     if sys.stdin.isatty():
         logging.info ( " No pipe detected. stdin connected to interactive terminal")
-        stdin_input = None
     else:
-        logging.info ( " Pipe detected.")
-        stdin_input = sys.stdin.read().strip()
-        logging.info ( " stdin data captured and trimmed." )
-        
-        if len(stdin_input) < 2:
-            print ("\nPiped stdin is invalid.")
-            sys.exit(1)
+        logging.info ( " Pipe detected. Reading in the data ...")
+        stdin_input = sys.stdin.read().strip()        
+        if len(stdin_input) > 1:
+            logging.info ( " stdin data is non-empty.")
+            stdin_IO = StringIO(stdin_input)
+        else:
+            print ("\nNo valid data in stdin.")
 
-    return stdin_input
+    return stdin_IO
 
-
-def get_pgn():
-
-# - - - - - - - 
-# FN get_pgn
-# description   : Looks for user input via stdin, CL args, and decides if prompt is needed
-# parameters    : none
-# requires      : global cl_args from ce_config
-# returns       : string containing input game PGN, or exits if there's conflict
-
-    global cl_args
+def prompt_input():
+    ''' descr   : Prompt user to enter PGN data, and return the entered text
+        params  : None
+        returns : StringIO object containing text entered by user if present
+                  Otherwise, None '''
     
-    piped_input = fetch_stdin()
-    clarg_input = None
+    logging.info (" Prompting user for PGN data at terminal ...")
 
-    if cfg.cl_args['game']:
-        clarg_input = cfg.cl_args['game'].strip()
-        if len(clarg_input) < 2:
-            clarg_input = None
+    usr_input = None
 
-    if piped_input and clarg_input:
-        print ("Warning: Program recived stdin data and --pgn argument. Please use one or the other.")
-        print ("Exiting.")
-        raise SystemExit(1)
-    elif piped_input:
-        logging.info(" Data from stdin selected for parsing.")
-        input_pgn = piped_input   
-    elif clarg_input:
-        logging.info(" Selecting game argument provided at command line.")
-        input_pgn = clarg_input
-    else:
-        logging.info(" Invalid or undefined PGN from CL arguments and stdin.")
-        logging.info(" Prompting for PGN input at terminal device.")
-        input_pgn = prompt_input()
-
-    return input_pgn
-
-
-def make_stream(input_string:str):
-# - - - - - - - 
-# FN make_stream
-# description   : create a text i/o stream object containing input string
-# parameters    : a string
-# returns       : io stream object containing text from input string
-
-
-#  *** take out while loop but check for empty string. or ditch the function altogether
-
-    output_stream = io.StringIO()
-
-    while not output_stream.getvalue():    
+    print()
+    while usr_input is None or len(usr_input) < 2:
         try:
-            output_stream = io.StringIO(input_string)
-        except (OSError, MemoryError):
-            print("A system error occurred creating text io stream. Exiting.")
-            raise SystemExit(1)
-        except (UnicodeEncodeError, UnicodeDecodeError, TypeError):
-            print ("Input text error creating io stream. Exiting.")
-            raise SystemExit(1)
-        finally:
-            logging.info (" Input stream created successfully.")
+            usr_input = input("Enter the game move list in PGN format: ").strip()
+        except (EOFError):
+            print ("You must enter at least one valid chess move.")
+            usr_input = None
 
-    return output_stream
+    logging.info (f" Input received: {usr_input}")
 
+    return StringIO(usr_input)
 
-def parse_pgn(pgn_stream:io.StringIO):
-# - - - - - - - 
-# FN parse_pgn
-# description   : Use chess module to build a game object from pgn data
-#                   https://python-chess.readthedocs.io/en/latest/pgn.html#chess.pgn.read_game
-# parameters    : stringIO stream containing pgn formatted text. One game per call.
-# returns       : populated game object
+def parse_pgn(pgn_stream):
+    ''' descr   : Use chess module to read in a PGN formatted move list from file or stream and build a game object
+        params  : stringio stream object containing the PGN move list for one game
+        returns : populated Chess game object for valid input. Exits if not. '''
     
-    #check for empty game
-    
-    logging.info (" parsing input PGN stream.")
+    logging.info (" Parsing input PGN stream ...")
 
-    logging.getLogger("chess.pgn").setLevel(logging.CRITICAL) # silence the parser
+    # turn down volume on parser. It's too noisy
+    logging.getLogger("chess.pgn").setLevel(logging.CRITICAL)
     
     pgn_parsed = chess.pgn.read_game(pgn_stream)
 
-    if pgn_parsed.errors:
-        print ("\nThe moves could not be imported because:")
+    if pgn_parsed is None:
+        print ("End of data reached. Exiting")
+        sys.exit(1)
+    elif pgn_parsed.errors:
+        print ("\nThe game could not be imported because:")
         print (pgn_parsed.errors)
         print ("\nPlease fix PGN and try again. Exiting")
-        sys.exit(1)
-    elif pgn_parsed is None:
-        print ("End of data reached. Exiting")
         sys.exit(1)
     elif pgn_parsed.end().ply() == 0:
         print ("Bad PGN data or no valid moves found.")
@@ -185,38 +152,70 @@ def parse_pgn(pgn_stream:io.StringIO):
         sys.exit(1)
 
     logging.info (" Game created successfully.")
-    
-
-
-    # try:
-    #     if hasattr(pgn_parsed, 'errors'):
-    #         print ("Error: Invalid game data.")
-    #         print (pgn_parsed.errors)
-    #         print ("Please fix PGN and try again.")
-    #         raise ValueError
-        
-    #     if pgn_parsed is None:
-    #         print ("End of data reached.")
-    #         raise ValueError
-
-    # except ValueError:
-        
-    #     print ("Exiting.")
-    #     raise SystemExit(1)
+    logging.info (f" {pgn_parsed.end().ply()} moves read.")
 
     return pgn_parsed
 
-
 def build_game():
-    # - - - - - - - 
-    # FN build_game
-    # description   : Fetches pgn data provided by user & uses it to build chess game object for analysis
-    # parameters    : string containing game PGN
-    # returns       : chess game object if pgn is valid. Exits if not
+    ''' descr   : Fetches pgn data provided by user & uses it to build chess game object for analysis
+        params  : none
+        returns : game_input chess object is populated if pgn is valid. Exits if not '''
 
     global game_input
+    global cl_args
+    
+    # do prelim checks and proceed based on results
+    piped_input = fetch_stdin()
+    clarg_input = fetch_cl_movelist()
+    file_input = fetch_file()
 
-    with make_stream(get_pgn()) as pgn_strio:
-        cfg.game_input=parse_pgn(pgn_strio)
+    # Looks for user input via stdin, CL args, and file, and decides if prompt is needed
 
+    # CASE 1: too many inputs
+    if (piped_input and clarg_input or
+        piped_input and file_input or
+        clarg_input and file_input):
 
+        print ("Warning: chesseval received too many inputs. Please provide only one.")
+        print ("Exiting.")
+        raise SystemExit(1)
+
+    # CASE 2: pgn entered via stdin
+    elif piped_input:
+        logging.info(" Data from stdin selected for parsing.")
+        pgnIO = piped_input
+
+    # CASE 3: move list entered via cli '-g' option
+    elif clarg_input:
+        logging.info(" Move list CL argument selected for parsing.")
+        pgnIO = clarg_input
+
+    # CASE 4: User provided a file path argument
+    elif file_input:
+        print("Using PGN file for input.")
+        pgnIO = file_input
+
+    # CASE 5: nothing provided at launch
+    else:
+        logging.info(" Undefined or invalid input at launch.")
+        pgnIO = prompt_input()
+
+    logging.info(f" Chosen input:\n{pgnIO.getvalue()}")
+    
+    cfg.game_input = parse_pgn(pgnIO)
+
+    return
+
+def export_pgn(game_pgn, pgn_outputfile):
+    ''' descr   : x
+        params  : x
+        returns : x '''
+    
+    try:
+        print(game_pgn, file=open(pgn_outputfile, "w"), end="\n\n")
+    except:
+        raise SystemExit("Unable to save PGN to file. Check path?. Exiting.")
+    else:
+        logging.info (" Game PGN saved to file.")
+
+    return

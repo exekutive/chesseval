@@ -3,6 +3,7 @@ A free, open-source, Python program that analyzes chess games for improving skil
 
 ### Instructions
 Installation and usage instructions can be found in the [chesseval.py](chesseval.py) header.
+You can also type 'python chesseval.py -h' to get usage help.
 
 You will need:
 * Familiarity with the command line environment

@@ -4,57 +4,65 @@
     
     Code to initialize global variables and generally setup
     the environment.
-    Configure things chess engine options, file paths and display
-    styles here.
+    Configure chess engine options, file paths and display
+    styles etc here.
     
     Note:     Logging requires Python 3.8 or newer
 
-    ################################################################
-
+    #####################################################################
 '''
 
 import argparse
 import logging
 import chess.pgn
 
-def set_clargs():
-# - - - - - - - 
-# FN set_clargs
-# description   : Define command line parameters and help page
-# parameters    : none
-# returns       : parser object
+cl_args = {}
 
+def set_clargs():
+    ''' descr   : Define command line parameters and help page
+        params  : None
+        returns : parser object '''
     parser = argparse.ArgumentParser (
         prog          = 'chesseval.py',
-        description   = 'Chess game evaluator. Accepts a chess game in Portable Game Notation (PGN). Evaluates the strength of each move, and plots the results on a chart. github.com/exekutive',
+        description   = 'Chess game evaluator. Accepts a chess game in Portable Game Notation (PGN). Evaluates the strength of each move, and plots the results on a chart. github.com/exekutive/chesseval',
         epilog        = '"One bad move nullifies forty good ones."'
     )
-
     
-    parser.add_argument('--game', '-g', type=str, help="Chess game/moves in Portable Game Notation.") 
-    parser.add_argument('-v', '--verbose',  action="count", default=0, help="increase output verbosity")
+    parser.add_argument('--verbose', '-v', action="count", default=0, help="increase output verbosity")
+    parser.add_argument('--nowdl', help="Do not show win/draw/lose stackplot", action="store_true", default=False)
+    parser.add_argument('--noexp', help="Do not show expected outcome lineplot", action="store_true", default=False)
+    parser.add_argument('--noadv', help="Do not show Pawn advantage lineplot", action="store_true", default=False)
+    parser.add_argument('--depth', '-d', type=int, help="Stockfish analysis depth limit (plies)")
+    parser.add_argument('--time', '-t', type=int, help="Stockfish analysis time limit (ms)")
+    parser.add_argument('--game', '-g', type=str, help="Move list text in Portable Game Notation") 
+    parser.add_argument('--import', '-i', type=str, help="Path to PGN file for import", metavar='file_path') 
+    parser.add_argument('--export', '-e', type=str, help="Path to PGN file for export. Default: ./ce_export.pgn", metavar='[file_path]', default='./ce_export.pgn') 
     
     logging.info(" Command line parameters defined.")
     
     return parser
     
 def fetch_clargs():
-# - - - - - - - 
-# FN fetch_clargs
-# description   : Retrieve arguments entered at the command line
-# parameters    : None
-# Requires      : parser object with defined args (pgn and verbosity)
-# returns       : dictionary object containing the parsed args (pgn string and verbosity level integer)
-#                 eg.
-#                 ce_test.py -vv -g '1. e4 e5 2. Nf3 Nf6 3. Bc4 Nxe4'
-#                 returns
-#                 {'game': '1. e4 e5 2. Nf3 Nf6 3. Bc4 Nxe4', 'verbose': 2}
+    ''' descr   : Retrieve arguments entered at the command line
+        params  : None
+        Requires: parser object with defined args (see set_clargs)
+                  global dictionary object cl_args
+        returns : none
+        eg.
+        ce_test.py -vv -g '1. e4 e5 2. Nf3 Nf6 3. Bc4 Nxe4'
+        returns
+        {'game': '1. e4 e5 2. Nf3 Nf6 3. Bc4 Nxe4', 'verbose': 2}
+        '''
 
+    global cl_args
 
-    fc_args = vars(set_clargs().parse_args())
-    logging.info ( f" Command line args captured: {fc_args}")
+    cl_args = vars(set_clargs().parse_args())
+
+    set_verbosity()
+
+    logging.info ( f" Command line args captured: {cl_args}")
     
-    return fc_args
+    return
 
 def set_verbosity():
 # - - - - - - - 
@@ -80,15 +88,14 @@ def set_verbosity():
 sf_options = dict(   # Stockfish UCI options
     path            = "/opt/homebrew/bin/stockfish",
     threads         = 8,
-    hash			= 24_000, #		    (MiB)
-    depth		    = 12,
-    time            = 200, #			ms
+    hash			= 24_000, #     (MiB)
+    depth		    = 12, #         (plies)
+    time            = 200, #        (ms)
     log			    = "./debugsf.txt",
     # syz_path      = "/somepath/syzygy"
 )
 
 pgn_outputfile	= "./analyzedgame.pgn"
-mate_eval       = 100_000 # initial cp score for mate. gets normalized later
 
 # matplotlib style arguments for graphs 
 rcstyle = {
@@ -97,7 +104,9 @@ rcstyle = {
     # 'axes.facecolor'    : '#C0BCA9',
     'axes.facecolor'    : 'none',
     'axes.spines.top'   : False,
-    'axes.spines.right' : False,
+    'axes.spines.right' : True,
+    'axes.spines.left'  : True,
+    'axes.spines.bottom': False,
     'axes.titlepad'     : '20.0',
     'axes.titlesize'    : '18',
     'axes.grid'         : False,
@@ -109,14 +118,19 @@ rcstyle = {
     'legend.facecolor'  : '#746C3C',
     'legend.framealpha' : '0.3',
     'legend.loc'        : 'upper right',
-    'lines.linewidth'   : '1.3',
-    'ytick.left'        : True,
+    'lines.linewidth'   : '1.5',
     'xtick.direction'   : 'out',
+    'xtick.major.size'  : 6,
+    'xtick.major.width' : 1.0,
+    'xtick.minor.size'  : 3,
+    'xtick.minor.width' : 0.5,
+    'ytick.left'        : True,
     'ytick.direction'   : 'out',
-    'ytick.major.size'  : 10,
-    'ytick.major.width' : 1.2,
-    'ytick.minor.size'  : 5,
-    'ytick.minor.width' : 0.6  
+    'ytick.major.size'  : 6,
+    'ytick.major.width' : 1.0,
+    'ytick.minor.size'  : 4,
+    'ytick.minor.width' : 0.5,
+    'font.family'       : 'sans-serif'
 }
 
 # additional graphical elements
@@ -132,10 +146,17 @@ chessplot_style = {
 }
 
 
-cl_args = fetch_clargs()
-set_verbosity()
+fetch_clargs()
+
+# override config values if command line args provided
+if cl_args['depth'] and cl_args['depth'] > 0:
+    sf_options['depth'] = cl_args['depth']
+
+if cl_args['time'] and cl_args['time'] > 0:
+    sf_options['time'] = cl_args['time']
+
 
 #* use chess.pgn.GameBuilder here?
 game_input = chess.pgn.Game()
 
-logging.info (" Game object initialized. Configuration complete.")
+logging.info (" Configuration complete. Game object initialized.")
