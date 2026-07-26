@@ -1,7 +1,7 @@
 ''' ############################# INFO ##################################
 
     chesseval
-    2026-JUN-16
+    2026-JUL-26
 
     https://github.com/exekutive/chesseval
     
@@ -22,6 +22,12 @@
             python chesseval.py -v -g "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#"
             echo "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#" | python chesseval.py
             python chesseval.py -i "/mydocs/last nights game.pgn"
+
+        Exporting:
+            - pgn
+            - csv
+            - figure
+            
 
     Troubleshooting:
         Only main lines are analyzed. Variations are ignored.
@@ -52,20 +58,22 @@
         -   time: Limit how long Stockfish spends analyzing a move (ms).  Can be specified per-game with command-line argument.
 
     PGN:
-        What is it? https://en.wikipedia.org/wiki/Portable_Game_Notation
+        What is PGN? https://en.wikipedia.org/wiki/Portable_Game_Notation
 '''
 
 import logging
+# manually set verbosity here. Valid only until import ce_config is called where user can override it.
+# logging.basicConfig (level = logging.INFO)
+# logging.basicConfig (level = logging.debug)
+
+
 import time
 time_start = time.time()
 
 import ce_config as cfg
-import ce_input as cei
+import ce_io as cio
 import ce_analyze as cea
 import ce_draw as ced
-
-# manually set verbosity here. Valid until (if) elevated by user args later
-# logging.basicConfig (level = logging.INFO)
 
 logging.info (" Started: %s\n" % time.ctime())
 
@@ -73,15 +81,29 @@ print ("\nStarting chesseval.py chess game evaluator.")
 print ("http://github.com/exekutive/chesseval")
 print ("Press Ctrl + C at any time to exit.\n")
 
-cei.build_game()    
+#####   Get Input
+cio.build_game()    
+
+
+#####   Analyze
 ge = cea.eval_game()
 time_analyzed = time.time()
 logging.info (f" Analysis time: {round(time.time() - time_start,3)} seconds")
-ced.draw_eval(ge)
 
-# ce_fileout.save_game(game_pgn, pgn_outputfile)
 
-# Exit
+######  Output
+if cfg.cl_args['export_pgn']:
+    cio.write_pgn()
+
+if cfg.cl_args['export_csv']:
+    cio.write_csv(ge)
+
+if cfg.cl_args['noplot'] is True and cfg.cl_args['export_fig'] is None:
+    logging.info (" No graphics needed. Skipping plot module.")
+else:
+    ced.draw_eval(ge)
+
+
+#####   Exit
 logging.info (f" Total execution time:\t{round(time.time() - time_start,3)} seconds")
 print ("\nExiting on %s" % time.ctime())
-

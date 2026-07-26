@@ -32,6 +32,7 @@ from io import StringIO
 import chess
 import chess.pgn
 import ce_config as cfg
+import time
 
 
 def fetch_cl_movelist():
@@ -206,16 +207,61 @@ def build_game():
 
     return
 
-def export_pgn(game_pgn, pgn_outputfile):
-    ''' descr   : x
-        params  : x
-        returns : x '''
+def write_pgn():
+    ''' descr   : writes move list to a PGN file including evaluation as annotations
+        params  : none. Uses globals cfg.game_input and cfg.cl_args['export_pgn']
+        returns : none. '''
     
-    try:
-        print(game_pgn, file=open(pgn_outputfile, "w"), end="\n\n")
-    except:
-        raise SystemExit("Unable to save PGN to file. Check path?. Exiting.")
-    else:
-        logging.info (" Game PGN saved to file.")
+    global game_input
+    global cl_args
+
+    logging.info (" Attempting PGN file export ...")
+
+    cfg.game_input.headers["Result"] = cfg.game_input.end().board().result()
+    cfg.game_input.headers["Event"] = "chesseval.py analysis"
+    cfg.game_input.headers["Site"] = "github.com/exekutive/chesseval"
+    cfg.game_input.headers["Date"] = time.ctime()
+
+
+    with open(cfg.cl_args['export_pgn'], "wt") as export_file:
+        print(cfg.game_input, file = export_file, end="\n\n")
+        logging.info (f" Game PGN saved to file {cfg.cl_args['export_pgn']}")
 
     return
+
+def write_csv(sf_eval):
+    ''' descr   : write analysis stats to a CSV file
+        params  : Stockfish evaluation from ce_analysze.eval_game()
+                  Uses globals cfg.game_input and cfg.cl_args['export_csv']
+        returns : none. '''
+    
+    import csv
+    global game_input
+    global cl_args
+
+    
+
+    logging.info (" Attempting CSV file export ...")
+
+    with open(cfg.cl_args['export_csv'], "wt", newline="", encoding="utf-8") as csv_file:
+        csv_out = csv.writer(csv_file)
+
+        move_list = list( chess.pgn.ChildNode.san(node) for node in cfg.game_input.mainline() )
+
+        csv_out.writerow( ['half_move'] + list(range(1,len(move_list)+1)) )
+        csv_out.writerow( ['move_san'] + move_list )
+
+        csv_out.writerow( ['wdl_black'] + sf_eval['wdl']['Black'] )
+        csv_out.writerow( ['wdl_draw'] + sf_eval['wdl']['Draw'] )
+        csv_out.writerow( ['wdl_white'] + sf_eval['wdl']['White'] )
+
+        csv_out.writerow( ['score_exp'] + sf_eval['score']['Expectation'] )
+        csv_out.writerow( ['score_adv'] + sf_eval['score']['Advantage'] )
+
+        csv_out.writerow( ['analysis_depth'] + sf_eval['analysis']['Depth'] )
+        csv_out.writerow( ['analysis_time'] + sf_eval['analysis']['Time'] )        
+
+        logging.info (f" Analysis saved to CSV file {cfg.cl_args['export_csv']}")
+
+    return
+

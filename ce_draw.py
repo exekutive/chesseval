@@ -57,11 +57,7 @@ def draw_eval(game_eval):
 
     global rcstyle
     global chessplot_style
-    global cl_args
-
-    print ("\nDisplaying evaluation graph...")
-    print ("(You must close the graph to end the program.)\n")
-
+    global cl_args   
 
     logging.info( " Building graph ...")
 
@@ -155,32 +151,39 @@ def draw_eval(game_eval):
 
         
         
-        # Draw a text box with engine parameters used
-        
-        eng_info = (r"$\bf{Analysis}$"
-                    f'\nDepth: {cfg.sf_options['depth']}\n'
-                    f'Time: {cfg.sf_options['time']}ms')
-        info_box = {
-            'boxstyle'    : 'round',
-            'facecolor'   : 'wheat',
-            'edgecolor'   : 'black',
-            'pad'         : 0.7,
-            'alpha'       : 0.5 }
-        ax_prob.text (
-            1.30, 0.3, eng_info,
-            transform           = ax_prob.transAxes,
-            fontsize            = 10,
-            horizontalalignment = 'left',
-            verticalalignment   = 'top',
-            bbox                = info_box )
+            # Draw a text box with engine parameters used
+            
+            eng_info = (r"$\bf{Analysis}$ $\bf{Limit}$"
+                        f'\nDepth: {cfg.sf_options['depth']}\n'
+                        f'Time: {cfg.sf_options['time']}ms')
+            info_box = {
+                'boxstyle'    : 'round',
+                'facecolor'   : 'wheat',
+                'edgecolor'   : 'black',
+                'pad'         : 0.7,
+                'alpha'       : 0.5 }
+            ax_prob.text (
+                1.30, 0.3, eng_info,
+                transform           = ax_prob.transAxes,
+                fontsize            = 10,
+                horizontalalignment = 'left',
+                verticalalignment   = 'top',
+                bbox                = info_box )
 
+            plt.tight_layout()
 
+            if cfg.cl_args['export_fig'] is not None:
+                fig1.savefig (
+                    cfg.cl_args['export_fig'],
+                    bbox_inches="tight",
+                    dpi=300 )
+                logging.info ( f" Graph saved to  {cfg.cl_args['export_fig']}")
 
-
-    logging.info ( " Rendering graph ...")
-
-
-    plt.tight_layout()
-    plt.show()
+            if cfg.cl_args['noplot'] is False:
+                print ("\nDisplaying graph ...\nYou must close the graph to end the program.\n")
+                plt.show()
+            else:
+                logging.info ( " Plot display is disabled.")
+                plt.close('all')
     
     return

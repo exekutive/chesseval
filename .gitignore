@@ -5,4 +5,5 @@ __pycache__/ce_analyze.cpython-314.pyc
 __pycache__/ce_config.cpython-314.pyc
 __pycache__/ce_draw.cpython-314.pyc
 __pycache__/ce_input.cpython-314.pyc
-chesseval-debug.py
+debug_analysis.txt
+ce_debug.py

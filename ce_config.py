@@ -29,15 +29,35 @@ def set_clargs():
     )
     
     parser.add_argument('--verbose', '-v', action="count", default=0, help="increase output verbosity")
+    parser.add_argument('--noplot', help="Skip displaying the analysis", action="store_true", default=False)
     parser.add_argument('--nowdl', help="Do not show win/draw/lose stackplot", action="store_true", default=False)
     parser.add_argument('--noexp', help="Do not show expected outcome lineplot", action="store_true", default=False)
     parser.add_argument('--noadv', help="Do not show Pawn advantage lineplot", action="store_true", default=False)
-    parser.add_argument('--depth', '-d', type=int, help="Stockfish analysis depth limit (plies)")
-    parser.add_argument('--time', '-t', type=int, help="Stockfish analysis time limit (ms)")
-    parser.add_argument('--game', '-g', type=str, help="Move list text in Portable Game Notation") 
-    parser.add_argument('--import', '-i', type=str, help="Path to PGN file for import", metavar='file_path') 
-    parser.add_argument('--export', '-e', type=str, help="Path to PGN file for export. Default: ./ce_export.pgn", metavar='[file_path]', default='./ce_export.pgn') 
-    
+    parser.add_argument('--depth', '-d', type=int, help="Use custom Stockfish analysis depth limit (plies)")
+    parser.add_argument('--time', '-t', type=int, help="Use custom Stockfish analysis time limit (ms)")
+    parser.add_argument('--game', '-g', type=str, help="Specify a move list in Portable Game Notation") 
+    parser.add_argument('--import', '-i', type=str, help="Enable PGN file import", metavar='file_path') 
+    parser.add_argument('--export_pgn', '-ep',
+        help    = "Enable PGN file export. Default path: ./ce_export.pgn",
+        metavar = 'file_path',
+        type    = str,
+        nargs   = '?', 
+        const   = './ce_export.pgn',
+        default = None )
+    parser.add_argument('--export_csv', '-ec',
+        help    = "Enable CSV file export. Default path: ./ce_export.csv",
+        metavar = 'file_path',
+        type    = str,
+        nargs   = '?', 
+        const   = './ce_export.csv',
+        default = None )
+    parser.add_argument('--export_fig', '-ef',
+        help    = "Enable plot figure export. Default path: ./ce_export.png",
+        metavar = 'file_path',
+        type    = str,
+        nargs   = '?', 
+        const   = './ce_export.png',
+        default = None )
     logging.info(" Command line parameters defined.")
     
     return parser
@@ -65,12 +85,9 @@ def fetch_clargs():
     return
 
 def set_verbosity():
-# - - - - - - - 
-# FN set_verbosity
-# description   : Sets the program verbosity level. 0=none, 1=info, 2+=debug
-# parameters    : None
-# Requires      : global cl_args with integer verbosity level. Can be 0, 1, 2, 3, ....
-# returns       : None
+    ''' descr   : Sets the program verbosity level. 0=none, 1=info, 2+=debug
+        params  : none. Uses global cfg.cl_args. Value can be 0, 1, 2, 3, ....
+        returns : none. '''
 
     global cl_args
 
@@ -89,9 +106,9 @@ sf_options = dict(   # Stockfish UCI options
     path            = "/opt/homebrew/bin/stockfish",
     threads         = 8,
     hash			= 24_000, #     (MiB)
-    depth		    = 12, #         (plies)
+    depth		    = 18, #         (plies)
     time            = 200, #        (ms)
-    log			    = "./debugsf.txt",
+    log			    = "./debug_sf.txt",
     # syz_path      = "/somepath/syzygy"
 )
 

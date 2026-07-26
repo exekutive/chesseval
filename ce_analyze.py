@@ -49,7 +49,6 @@ def inst_engine():
 
     return eng_inst
 
-
 def flatten_adv( report:dict, cp_max:int ):
     ''' descr   : flatten scores of mate moves
         params  : report - game evaluation data,
@@ -77,7 +76,10 @@ def eval_game():
     eval_wdl_win = []   # White win probability
     eval_wdl_draw = []  # Draw probability
     eval_wdl_lose = []  # Black win probability
-    adv_max = 0
+    eval_depth = []     # How deep the engine went for this move
+    eval_time = []      # How long the engine spent evaluating the move
+    
+    adv_max = 0         # keeps track of maximum advantage reached
 
     sf_inst = inst_engine()
 
@@ -93,31 +95,41 @@ def eval_game():
     for number, mainline_node in enumerate(cfg.game_input.mainline()):
 
         logging.info(f" Evaluating node\t: {number}")
+        logging.info(f" UCI Move\t\t: {mainline_node.move}")
+        logging.info(f" Result\t\t: {mainline_node.board().result()}")
 
         move_eval = sf_inst.analyse(    mainline_node.board(),
                                         ce.Limit(
                                             depth = cfg.sf_options['depth'],
-                                            time = cfg.sf_options['time'] / 1000 ))
+                                            time = cfg.sf_options['time'] / 1000 ),
+                                            info = chess.engine.INFO_SCORE)
+        
+        # raw analysis report for debugging
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            with open("./debug_analysis.txt", "at") as debug_file:
+                print(f"{number}\t{mainline_node.move}", file = debug_file)
+                print(move_eval, file = debug_file)
 
         eval_adv.append(move_eval['score'].pov(chess.WHITE).score( mate_score = 100_000 ))
 
 
         if mainline_node.board().is_game_over():
-            logging.info(f" Final move\t\t: {mainline_node.move}")
-            logging.info (" End of game.\n")
+            logging.info (" Ending move.\n")
 
-            # Stockfish does not provide WDL eval for game end moves, so revert to CP advantage based WDL calculation
+            # Stockfish does not report all stats (time, wdl, depth=0) for end-game moves,
+            # so use CP advantage to populate wdl values and make graph complete 
             eval_exp.append(        move_eval['score'].wdl().white().expectation())
             eval_wdl_win.append(    move_eval['score'].wdl().white().winning_chance())
             eval_wdl_draw.append(   move_eval['score'].wdl().white().drawing_chance())
             eval_wdl_lose.append(   move_eval['score'].wdl().white().losing_chance())
 
         else: # normal move
-            logging.info(f" UCI Move\t\t: {mainline_node.move}")
             eval_exp.append(        move_eval['wdl'].white().expectation())
             eval_wdl_win.append(    move_eval['wdl'].white().winning_chance())
             eval_wdl_draw.append(   move_eval['wdl'].white().drawing_chance())
             eval_wdl_lose.append(   move_eval['wdl'].white().losing_chance())
+            eval_depth.append(      move_eval['depth'])
+            eval_time.append(       move_eval['time'])
 
             if move_eval['score'].is_mate():
                 logging.info(" Forced mate.\n")
@@ -126,12 +138,17 @@ def eval_game():
                 adv_max = max( adv_max, abs( move_eval['score'].pov(chess.WHITE).score()))
                 logging.info(f" Maximum advantage\t: {adv_max} cP\n")
 
+            
+            # Annotations/comments for export
+            mainline_node.set_eval( move_eval['score'], move_eval['depth'] )
+            mainline_node.comment = (   f"{mainline_node.comment} "
+                                        f"W{eval_wdl_win[-1]:.2f}/D{eval_wdl_draw[-1]:.2f}/L{eval_wdl_lose[-1]:.2f}"
+                                        f"/X{eval_exp[-1]:.2f} "
+                                        f"{move_eval['time']}s" )
+                
 
-    
     sf_inst.quit()
     logging.info (" Stockfish engine despawned.")
-
-
 
     print ("Evaluation complete.")
 
@@ -140,18 +157,12 @@ def eval_game():
                         'Draw'          : eval_wdl_draw,
                         'White'         : eval_wdl_win},
         "score"     : { 'Expectation'   : eval_exp,
-                        'Advantage'     : eval_adv}
+                        'Advantage'     : eval_adv},
+        "analysis"  : { 'Depth'         : eval_depth,
+                        'Time'          : eval_time}
             }
 
     flatten_adv( eval_report, adv_max )
 
     return eval_report
     
-# #   record analysis to PGN comment field:
-
-# mainline_node.set_eval(move_analysis['score'], move_analysis['depth'])
-# mainline_node.comment = (
-# f"{mainline_node.comment} "
-# f"WDL: {i_wdl_w:.2f}/{i_wdl_d:.2f}/{i_wdl_l:.2f} | " 
-# f"Exp: {i_wdl_e:.2f}"
-# )
